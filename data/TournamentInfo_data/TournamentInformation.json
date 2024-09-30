@@ -1,0 +1,10 @@
+[
+    {
+        "id": 1,
+        "name": "中国高専大会",
+        "venue": "高浜公園",
+        "date": "2024/7/5",
+        "players": "data/Players_data/players_20240930T153219394Z_64925.json",
+        "results": "data/Results_data/result_20240930T153219394Z_48994.json"
+    }
+]
