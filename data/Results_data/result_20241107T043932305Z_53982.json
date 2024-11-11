@@ -1,0 +1,457 @@
+{
+    "singles": {
+        "base_tournament": {
+            "1": [
+                {
+                    "id": 1,
+                    "player1": "伊藤・上江洲",
+                    "player2": "bye",
+                    "winner": "伊藤・上江洲",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 2,
+                    "player1": "谷口・大原",
+                    "player2": "則本・小林",
+                    "winner": "則本・小林",
+                    "loser": "谷口・大原",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 1
+                        },
+                        "game": {
+                            "1": {
+                                "player1": 0,
+                                "player2": 1
+                            }
+                        }
+                    }
+                },
+                {
+                    "id": 3,
+                    "player1": "井上・加来",
+                    "player2": "新田・高橋",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 4,
+                    "player1": "増田・網谷",
+                    "player2": "木村・坂根",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 5,
+                    "player1": "佐々木・川中",
+                    "player2": "小東・賀美",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 6,
+                    "player1": "三井・松岡",
+                    "player2": "佐伯・原田",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 7,
+                    "player1": "宮代・小椋",
+                    "player2": "藤田・和泉",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 8,
+                    "player1": "籾蔵・引頭",
+                    "player2": "石原・岡田",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 9,
+                    "player1": "岡本・山根",
+                    "player2": "安藤・北野",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 10,
+                    "player1": "弓戸・田中",
+                    "player2": "永瀬・飛田",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 11,
+                    "player1": "青戸・吉岡",
+                    "player2": "岡村・廣本",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 12,
+                    "player1": "鴨川・岡本",
+                    "player2": "三浦・森口",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 13,
+                    "player1": "藤岡・山本",
+                    "player2": "松永・中村",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 14,
+                    "player1": "田中・米村",
+                    "player2": "伊原・原井",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 15,
+                    "player1": "新庄・得能",
+                    "player2": "吉田・河村",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 16,
+                    "player1": "辻・渡邊",
+                    "player2": "早井・松岡",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                }
+            ],
+            "2": [
+                {
+                    "id": 1,
+                    "player1": "伊藤・上江洲",
+                    "player2": "則本・小林",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 2,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 3,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 4,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 5,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 6,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 7,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 8,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                }
+            ],
+            "3": [
+                {
+                    "id": 1,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 2,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 3,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 4,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                }
+            ],
+            "4": [
+                {
+                    "id": 1,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                },
+                {
+                    "id": 2,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                }
+            ],
+            "5": [
+                {
+                    "id": 1,
+                    "player1": "",
+                    "player2": "",
+                    "winner": "",
+                    "loser": "",
+                    "result": {
+                        "count": {
+                            "c1": 0,
+                            "c2": 0
+                        },
+                        "game": []
+                    }
+                }
+            ]
+        }
+    },
+    "doubles": [],
+    "team": []
+}

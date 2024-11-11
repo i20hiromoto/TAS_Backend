@@ -4,7 +4,16 @@
         "name": "中国高専大会",
         "venue": "高浜公園",
         "date": "2024/7/5",
-        "players": "data/Players_data/players_20240930T153219394Z_64925.json",
-        "results": "data/Results_data/result_20240930T153219394Z_48994.json"
+        "gendate": "2024/11/07",
+        "players": "data/Players_data/players_20241107T043932305Z_10384.json",
+        "results": "data/Results_data/result_20241107T043932305Z_53982.json",
+        "sport": "badminton",
+        "point_name": "game",
+        "ranking": "none",
+        "competition": [
+            true,
+            false,
+            false
+        ]
     }
 ]
