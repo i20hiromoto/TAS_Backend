@@ -1,20 +1,29 @@
 // src/app.ts
 import express from "express";
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import * as bodyParser from "body-parser";
 import * as fs from "fs";
 import cors from "cors";
 import multer from "multer";
 import xlsx from "xlsx";
 import path, { parse } from "path";
-import { add, format } from "date-fns";
-import { match } from "assert";
+import Excel from "exceljs";
+import jwt from "jsonwebtoken";
+import bcrypt from "bcrypt";
+import dotenv from "dotenv";
+import { v4 as uuidv4 } from "uuid";
 
 const app = express();
 const jsonFilePath = "data/Players_data/sample_player.json";
-const tournamentInfoFilePath =
-  "data/TournamentInfo_data/TournamentInformation.json";
+const ProjectsPath = "data/Projects/projects.json";
+const usersdataPath = path.join(
+  __dirname,
+  "../data",
+  "Users_data",
+  "users_data.json"
+);
 
+dotenv.config();
 app.use(bodyParser.json());
 app.use(cors());
 app.use("/files", express.static(path.join(__dirname, "../data/Inputdata")));
@@ -28,17 +37,12 @@ interface PlayerData {
   team: string;
 }
 
-interface FirstSheetData {
-  id: number;
-  name: string | null;
-  venue: string | null;
-  date: string | null;
-}
-
 interface ResultData {
   id: number;
   player1: string;
+  team1: string;
   player2: string;
+  team2: string;
   winner: string;
   loser: string;
   result: {
@@ -64,6 +68,27 @@ interface TourInfo {
   competition: [singles: false, doubles: false, group: false];
 }
 
+interface User {
+  id: string; // ユーザーID
+  name: string; // ユーザー名
+  email: string; // メールアドレス
+  password: string; // パスワード
+}
+
+interface UserPayload {
+  id: string;
+  name: string;
+  email: string;
+  projects: ProjectRole[];
+  iat?: number; // トークン発行時刻 (issued at)
+  exp?: number; // トークン有効期限 (expiration)
+}
+
+interface ProjectRole {
+  projectId: string; // プロジェクトID
+  role: "admin" | "editor" | "viewer"; // 権限（管理者、編集者、閲覧者）
+}
+
 // playerdata.json ファイルからデータを読み取る関数
 function getDataFromFile(filePath: string): any[] {
   const rawData = fs.readFileSync(filePath, "utf-8");
@@ -75,6 +100,228 @@ function getDataFromFile(filePath: string): any[] {
 const saveDataToFile = (data: any[], jsonFilePath: any) => {
   fs.writeFileSync(jsonFilePath, JSON.stringify(data, null, 4), "utf-8");
 };
+
+const copyExcelFile = (
+  sourceFilePath: string,
+  destinationFilePath: string
+): void => {
+  fs.copyFile(sourceFilePath, destinationFilePath, (err) => {
+    if (err) {
+      console.error("ファイルのコピー中にエラーが発生しました:", err);
+      return;
+    }
+    console.log(`ファイルがコピーされました: ${destinationFilePath}`);
+  });
+};
+
+const deleteFile = (filePath: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        reject("ファイルの削除中にエラーが発生しました: " + err);
+      } else {
+        console.log(`ファイルが削除されました: ${filePath}`);
+        resolve();
+      }
+    });
+  });
+};
+
+const writeDataToExcel = async (
+  filePath: string,
+  data: any,
+  tournPath: any,
+  sourcePath: any
+): Promise<void> => {
+  // ファイルが存在するか確認
+  if (!fs.existsSync(filePath)) {
+    console.error("ファイルが存在しません:", filePath);
+    return;
+  }
+  if (!fs.existsSync(tournPath)) {
+    console.error("ファイルが存在しません:", tournPath);
+    return;
+  }
+  const startCell = "C3";
+  const sheetName = ["singles_players", "doubles_players", "team_players"];
+  const key = ["singles", "doubles", "team"];
+
+  // Excelファイルを読み込む
+  const workbook = new Excel.Workbook();
+  await workbook.xlsx.readFile(filePath);
+
+  // セル参照を行列インデックスに変換
+  const startCellRef = decodeCell(startCell);
+
+  // データを書き込む
+  for (let i = 0; i < key.length; i++) {
+    const sheet = workbook.getWorksheet(sheetName[i]);
+    if (!sheet) {
+      console.error("指定されたシートが存在しません:", sheetName[i]);
+      continue;
+    }
+
+    if (!data[key[i]]["base_tournament"]) {
+      console.error("トーナメントデータが存在しません:", key[i]);
+      continue;
+    }
+
+    const tournamentData = data[key[i]]["base_tournament"]["1"];
+    console.log(tournamentData);
+
+    let rowIndex = startCellRef.row;
+
+    tournamentData.forEach((match: { player1: string; player2: string }) => {
+      // Player 1
+      const cellAddress1 = sheet.getCell(rowIndex, startCellRef.column);
+      cellAddress1.value = match.player1;
+
+      // Player 2
+      rowIndex++;
+      const cellAddress2 = sheet.getCell(rowIndex, startCellRef.column);
+      cellAddress2.value = match.player2;
+
+      rowIndex++;
+    });
+
+    const sourceWorkbook = xlsx.readFile(tournPath);
+    const tourn_size = tournamentData.length * 2;
+    const sheet2Name = `Top${tourn_size}`;
+    const sourceSheet = sourceWorkbook.Sheets[sheet2Name];
+    if (!sourceSheet) {
+      throw new Error(`シート ${sheetName} が見つかりません。`);
+    }
+
+    if (!fs.existsSync(filePath)) {
+      copyExcelFile(sourcePath, filePath);
+    }
+
+    // sheet2をコピーしてfilePathに追加
+  }
+
+  // ファイルを書き込む
+  await workbook.xlsx.writeFile(filePath);
+  console.log(`データが書き込まれました: ${filePath}`);
+};
+
+// セル参照を行列インデックスに変換する関数
+const decodeCell = (cellRef: string) => {
+  const regex = /^([A-Z]+)(\d+)$/; // セルの参照形式にマッチする正規表現（例: "C3"）
+  const match = regex.exec(cellRef);
+  if (!match) {
+    throw new Error(`無効なセル参照: ${cellRef}`);
+  }
+
+  const column = match[1]; // 列名（例: "C"）
+  const row = parseInt(match[2], 10); // 行番号（例: 3）
+
+  // 列名（アルファベット）を数字に変換（例: "C" -> 3）
+  let columnIndex = 0;
+  for (let i = 0; i < column.length; i++) {
+    columnIndex = columnIndex * 26 + (column.charCodeAt(i) - 65 + 1);
+  }
+
+  return { row, column: columnIndex };
+};
+
+//ユーザ登録エンドポイント
+app.post("/register", async (req: Request, res: Response) => {
+  const { name, email, password } = req.body.data;
+  console.log("req.body", req.body);
+  // バリデーション
+  if (!name || !email || !password) {
+    console.log("Name, email, and password are required");
+    return res.status(400).send("Name, email, and password are required");
+  }
+
+  // パスワードのハッシュ化
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  // 新しいユーザーオブジェクトの作成
+  const newUser: User = {
+    id: uuidv4(),
+    name,
+    email,
+    password: hashedPassword,
+  };
+
+  // ユーザーデータを読み込み、新しいユーザーを追加
+  const users = getDataFromFile(usersdataPath);
+  users.push(newUser);
+
+  // ユーザーデータを書き込み
+  saveDataToFile(users, usersdataPath);
+
+  // レスポンスを返す
+  console.log("newUser", newUser);
+  res.status(201).send("User registered" + newUser);
+});
+
+// ログインエンドポイント
+app.post("/login", async (req: Request, res: Response) => {
+  const { email, password } = req.body.data;
+  const users: User[] = getDataFromFile(usersdataPath);
+  const user: any = users.find((u: any) => u.email === email);
+  if (!user || !(await bcrypt.compare(password, user.password))) {
+    return res.status(401).json({ message: "Invalid credentials" });
+  }
+
+  const token = jwt.sign({ user }, process.env.JWT_SECRET as string, {
+    expiresIn: "1h",
+  });
+
+  res.json({ token });
+});
+
+//大会情報取得エンドポイント
+app.get("/get-tourn-file", async (req: Request, res: Response) => {
+  try {
+    const id = req.query.id;
+    const tourInfo: TourInfo[] = getDataFromFile(ProjectsPath);
+    const tour = tourInfo.find((info) => info.id === parseInt(id as string));
+    if (!tour) {
+      return res
+        .status(404)
+        .json({ error: "Tournament information not found" });
+    }
+    const players: any = getDataFromFile(tour.players);
+    const matches: any = getDataFromFile(tour.results);
+    const formattedDate = tour.date.replace(/\//g, "");
+    const sourceFilePath = path.join(
+      __dirname,
+      "../data/Inputdata/output.xlsx"
+    );
+    const tournFilePath = path.join(
+      __dirname,
+      "../data/Inputdata/tournament.xlsx"
+    );
+    const destinationFilePath = path.join(
+      __dirname,
+      `../data/Inputdata/${tour.name}${formattedDate}.xlsx`
+    );
+    writeDataToExcel(
+      destinationFilePath,
+      matches,
+      tournFilePath,
+      sourceFilePath
+    );
+
+    res.download(
+      destinationFilePath,
+      `${tour.name}${tour.date}.xlsx`,
+      async (err) => {
+        if (err) {
+          console.error("File download error:", err);
+        }
+        console.log(`ファイルがダウンロードされました: ${destinationFilePath}`);
+        await deleteFile(destinationFilePath);
+      }
+    );
+  } catch (error) {
+    console.error("Error processing request:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
 //プレイヤーデータを追加するエンドポイント
 app.post("/add-player", (req, res) => {
@@ -145,6 +392,7 @@ app.get("/locate-players", (req, res) => {
   res.json(result.tournament);
 });
 
+//トーナメントデータ取得エンドポイント
 app.get("/get-tournament", (req, res) => {
   const tournamentData = getDataFromFile(
     "data/Results_data/result_20240925T095311426Z_92407.json"
@@ -152,40 +400,118 @@ app.get("/get-tournament", (req, res) => {
   res.json(tournamentData);
 });
 
+//管理者用データ取得エンドポイント
 app.get("/get-admin-data", (req, res) => {
-  const id: number = parseInt(req.query.id as string);
-  const Tour_Info = getDataFromFile(tournamentInfoFilePath);
+  const id = parseInt(req.query.id as string);
+  const Tour_Info = getDataFromFile(ProjectsPath);
   const tour = Tour_Info.filter((info) => info.id === id).flat()[0];
   if (!tour) {
     return res.status(404).json({ error: "Tournament information not found" });
   }
   const players = getDataFromFile(tour.players);
   const matches = getDataFromFile(tour.results);
-  const data = { Tour_Info, players, matches };
+  const data = { players, matches };
   res.json(data);
 });
 
-const keyMapping: { [key: string]: string } = {
-  B: "group",
-  C: "name",
-  D: "seed",
+// ファイルを削除する関数
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "data/Inputdata/"); // 保存先ディレクトリ
+  },
+  filename: (req, file, cb) => {
+    cb(null, generateInputFileName(file.originalname)); //
+  },
+});
+
+// ファイルアップロードの設定
+const upload = multer({ storage: storage });
+
+app.post("/entry", upload.single("file"), (req, res) => {
+  const id = req.body.id;
+  const file = req.file;
+  if (!file) {
+    console.error("No file uploaded");
+    return res.status(400).send("No file uploaded");
+  }
+  const tourinfo = getDataFromFile(ProjectsPath);
+  const date = new Date();
+  const tour = tourinfo.find((info) => info.id === (id as string));
+  if (date > new Date(tour.deadline)) {
+    return res.status(400).send("The deadline has passed");
+  }
+  const data: any = getDatafromExcel(tour, file);
+  const players: any = getDataFromFile(tour.players);
+  if (!players) {
+    return res.status(404).json({ error: "Player information not found" });
+  }
+  console.log("data", data);
+  if (tour.competition[0] === true)
+    players["singles"].push(data.Players_Data["singles"]);
+  if (tour.competition[1] === true)
+    players["doubles"].push(data.Players_Data["doubles"]);
+  if (tour.competition[2] === true)
+    players.Players_Data["team"].push(data["team"]);
+
+  console.log("players", players);
+  saveDataToFile(players, tour.players);
+  res.json({ message: "Data uploaded successfully" });
+});
+
+const Singles_Mapping: { [key: string]: string } = {
+  B: "name",
+  C: "team",
+  D: "team_rank",
 };
 
-const keysToTransform = Object.keys(keyMapping);
+const Doubles_Mapping: { [key: string]: string } = {
+  B: "name1",
+  C: "name2",
+  D: "team",
+  E: "team_rank",
+};
 
-const transformData = (data: any[]) => {
-  return data.map((item) => {
-    const transformed: { [key: string]: any } = {};
-    for (const [key, value] of Object.entries(item)) {
-      if (keysToTransform.includes(key)) {
-        const newKey = keyMapping[key];
-        transformed[newKey] = value;
-      } else {
-        transformed[key] = value;
-      }
-    }
-    return transformed;
-  });
+const Singles_keyTransform = Object.keys(Singles_Mapping);
+const Doubles_keyTransform = Object.keys(Doubles_Mapping);
+
+const transformData = (data: any, competition: any) => {
+  let transformedData = {};
+  if (competition["singles"] === true) {
+    transformedData = {
+      ...transformedData,
+      singles: data.singles.map((item: any) => {
+        const transformedItem: any = {};
+        Singles_keyTransform.forEach((key) => {
+          transformedItem[Singles_Mapping[key]] = item[key];
+        });
+        return transformedItem;
+      }),
+    };
+  }
+  if (competition["doubles"] === true) {
+    transformedData = {
+      ...transformedData,
+      doubles: data.doubles.map((item: any) => {
+        const transformedItem: any = {};
+        Doubles_keyTransform.forEach((key) => {
+          transformedItem[Doubles_Mapping[key]] = item[key];
+        });
+        return transformedItem;
+      }),
+    };
+  }
+  if (competition["team"] === true) {
+    transformedData = {
+      team: data.team.map((item: any) => {
+        const transformedItem: any = {};
+        Singles_keyTransform.forEach((key) => {
+          transformedItem[Singles_Mapping[key]] = item[key];
+        });
+        return transformedItem;
+      }),
+    };
+  }
+  return transformedData;
 };
 
 // エクセルの日付をJSの日付に変換
@@ -213,14 +539,6 @@ const excelDateToJSDate = (serial: any) => {
   );
 };
 
-// ファイルを作成する関数
-function createDirectory(filePath: any) {
-  const dirname = path.dirname(filePath);
-  if (!fs.existsSync(dirname)) {
-    fs.mkdirSync(dirname, { recursive: true });
-  }
-}
-
 // ファイル名を生成する関数
 const generateFileName = (FileKindName: any) => {
   const timestamp = new Date().toISOString().replace(/[-:.]/g, "");
@@ -236,74 +554,103 @@ const generateInputFileName = (originalname: any) => {
   return `${timestamp}_${randomNum}${ext}`;
 };
 
-// ファイルを削除する関数
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "data/Inputdata/"); // 保存先ディレクトリ
-  },
-  filename: (req, file, cb) => {
-    cb(null, generateInputFileName(file.originalname)); //
-  },
-});
-
-// ファイルアップロードの設定
-const upload = multer({ storage: storage });
-
 // アップロードされたExcelファイルからデータを取得する関数
-function getDatafromExcel(file: any): {
-  Tour_Info: FirstSheetData;
+function getDatafromExcel(
+  tour: any,
+  file: any
+): {
   Players_Data: any[];
 } {
   const workbook = xlsx.readFile(file.path);
-
-  // 1枚目のシートのデータを取得
-  const firstSheetName = workbook.SheetNames[0];
-  const firstSheet = workbook.Sheets[firstSheetName];
-  const Tour_Info: FirstSheetData = {
-    id: 0,
-    name: firstSheet["B4"] ? firstSheet["B4"].v : null,
-    venue: firstSheet["C4"] ? firstSheet["C4"].v : null,
-    date: firstSheet["D4"]
-      ? typeof firstSheet["D4"].v === "number"
-        ? excelDateToJSDate(firstSheet["D4"].v).toLocaleDateString()
-        : firstSheet["D4"].v
-      : null,
-  };
-
-  //2枚目のシートのデータを取得
-  const secondsheetName = workbook.SheetNames[1];
-  const secondsheet = workbook.Sheets[secondsheetName];
   const startRow = 4;
-  //const endRow = parseInt(size) + 3;
-  const columns = ["B", "C", "D"];
-  const data = [];
-  // シートの範囲を取得
-  const range = secondsheet["!ref"];
-  if (!range) throw new Error("シートの範囲が取得できませんでした");
-
-  // 範囲を解析して、最終行を取得
-  const endRow = xlsx.utils.decode_range(range).e.r + 1;
-  for (let row = startRow; row <= endRow; row++) {
-    const rowData: any = {};
-    columns.forEach((col) => {
-      const cellAddress = `${col}${row}`;
-      const cell = secondsheet[cellAddress];
-      rowData[col] = cell ? cell.v : null;
-    });
-    data.push(rowData);
+  const data: any = {};
+  // 1枚目のシートのデータを取得
+  if (tour.competition["singles"] === true) {
+    const firstSheetName = workbook.SheetNames[0];
+    const firstSheet = workbook.Sheets[firstSheetName];
+    const sheet1_columns = ["B", "C", "D"];
+    const singles = [];
+    const range1 = firstSheet["!ref"];
+    if (!range1) throw new Error("シートの範囲が取得できませんでした");
+    const endRow1 = xlsx.utils.decode_range(range1).e.r + 1;
+    for (let row = startRow; row <= endRow1; row++) {
+      const rowData: any = {};
+      sheet1_columns.forEach((col) => {
+        const cellAddress = `${col}${row}`;
+        const cell = firstSheet[cellAddress];
+        rowData[col] = cell ? cell.v : null;
+      });
+      if (
+        rowData["B"] !== null &&
+        rowData["C"] !== null &&
+        rowData["D"] !== null
+      )
+        singles.push(rowData);
+    }
+    data["singles"] = singles;
   }
-  const transformedData = transformData(data);
-  // const playerIndex = transformedData.findIndex(
-  //   (player) =>
-  //     player.group === null && player.name === null && player.seed === null
-  // );
-  // transformedData.splice(playerIndex, 1);
+
+  if (tour.competition["doubles"] === true) {
+    //2枚目のシートのデータを取得
+    const secondsheetName = workbook.SheetNames[1];
+    const secondsheet = workbook.Sheets[secondsheetName];
+    const sheet2_columns = ["B", "C", "D", "E"];
+    const doubles = [];
+    // シートの範囲を取得
+    const range = secondsheet["!ref"];
+    if (!range) throw new Error("シートの範囲が取得できませんでした");
+    // 範囲を解析して、最終行を取得
+    const endRow = xlsx.utils.decode_range(range).e.r + 1;
+    for (let row = startRow; row <= endRow; row++) {
+      const rowData: any = {};
+      sheet2_columns.forEach((col) => {
+        const cellAddress = `${col}${row}`;
+        const cell = secondsheet[cellAddress];
+        rowData[col] = cell ? cell.v : null;
+      });
+      if (
+        rowData["B"] !== null &&
+        rowData["C"] !== null &&
+        rowData["D"] !== null &&
+        rowData["E"] !== null
+      ) {
+        doubles.push(rowData);
+      }
+    }
+    data["doubles"] = doubles;
+  }
+
+  if (tour.competition["team"] === true) {
+    //3枚目のシートのデータを取得
+    const thirdsheetName = workbook.SheetNames[2];
+    const thirdsheet = workbook.Sheets[thirdsheetName];
+    const sheet3_columns = ["C"];
+    const team = [];
+    // シートの範囲を取得
+    const range3 = thirdsheet["!ref"];
+    if (!range3) throw new Error("シートの範囲が取得できませんでした");
+    // 範囲を解析して、最終行を取得
+    const endRow3 = xlsx.utils.decode_range(range3).e.r + 1;
+    for (let row = startRow; row <= endRow3; row++) {
+      const rowData: any = {};
+      sheet3_columns.forEach((col) => {
+        const cellAddress = `${col}${row}`;
+        const cell = thirdsheet[cellAddress];
+        rowData[col] = cell ? cell.v : null;
+      });
+      team.push(rowData);
+    }
+    if (team[0]["C"] !== null) data["team"] = team;
+  }
+
+  const transformedData = transformData(data, tour.competition);
+  console.log("transformedData", transformedData);
   fs.unlink(file.path, (err) => {
     if (err) {
       console.error("Failed to delete uploaded file:", err);
     }
   });
-  return { Tour_Info, Players_Data: transformedData };
+  return { Players_Data: transformedData as any };
 }
 
 // トーナメントにデータを割り当てる関数
@@ -324,7 +671,9 @@ const locateRound = (players: any[]) => {
         roundData.push({
           id: i + 1,
           player1: players[idx].name,
+          team1: players[idx].team,
           player2: players[idx + 1].name,
+          team2: players[idx + 1].team,
           winner: "",
           loser: "",
           result: {
@@ -336,7 +685,9 @@ const locateRound = (players: any[]) => {
         roundData.push({
           id: i + 1,
           player1: "",
+          team1: "",
           player2: "",
+          team2: "",
           winner: "",
           loser: "",
           result: {
@@ -413,31 +764,16 @@ const Rankinglocate = (
 };
 
 // 簡易版ファイルアップロードエンドポイント
-app.post("/upload_simple", upload.single("file"), async (req, res) => {
-  const file = req.file;
-  const sport = req.body.selectValue;
-  const ranking = req.body.selectValue2;
-  const competition = req.body.selectValue3;
-  const cmp_array = [false, false, false];
-  console.log(competition);
-  if (competition === "singles") {
-    cmp_array[0] = true;
-  }
-  if (competition === "doubles") {
-    cmp_array[1] = true;
-  }
-  if (competition === "group") {
-    cmp_array[2] = true;
-  }
-  console.log(cmp_array);
-
-  if (!file) {
-    return res.status(400).json({ message: "No file uploaded" });
-  }
-
+app.post("/generate-tourn", upload.single("file"), async (req, res) => {
+  console.log("req.body", req.body);
+  const name = req.body.name;
+  const date = req.body.date;
+  const venue = req.body.venue;
+  const deadline = req.body.deadline;
+  const ranking = req.body.ranking;
+  const sport = req.body.sport;
+  const competition = JSON.parse(req.body.competition);
   try {
-    const data: any = await getDatafromExcel(file);
-
     // 選手情報、結果情報の格納先ファイル名を生成
     const newPlayersFileName = generateFileName("players");
     const newPlayersFilePath = path.join(
@@ -446,10 +782,7 @@ app.post("/upload_simple", upload.single("file"), async (req, res) => {
     );
     const newResultFileName = generateFileName("result");
     const newResultFilePath = path.join("data/Results_data", newResultFileName);
-    const formattedDate = format(new Date(), "yyyy/MM/dd");
-
     let point_name = "";
-
     if (
       sport === "badminton" ||
       sport === "softtennis" ||
@@ -459,24 +792,24 @@ app.post("/upload_simple", upload.single("file"), async (req, res) => {
     } else if (sport === "tennis") {
       point_name = "set";
     }
-
     // 大会情報を格納した配列に選手情報、結果情報のパスを追加する処理
+    let tourInfoData: any[] = await getDataFromFile(ProjectsPath);
     const addInfoData = {
-      ...data.Tour_Info,
-      gendate: formattedDate,
+      id: uuidv4(),
+      name: name,
+      date: date,
+      venue: venue,
+      deadline: deadline,
       players: newPlayersFilePath,
       results: newResultFilePath,
       sport: sport,
       point_name: point_name,
       ranking: ranking,
-      competition: cmp_array,
+      competition: competition,
+      generate_tourn: false,
     };
-
     // 各トーナメント情報を格納したファイルにデータを追加する処理
-    let tourInfoData: any[] = await getDataFromFile(tournamentInfoFilePath);
-    addInfoData.id = tourInfoData.length + 1;
     tourInfoData = tourInfoData.flat();
-
     let tour_array: { [key: string]: any[] } = {
       singles: [],
       doubles: [],
@@ -487,47 +820,11 @@ app.post("/upload_simple", upload.single("file"), async (req, res) => {
       doubles: [],
       team: [],
     };
-
     tourInfoData.push(addInfoData);
-
-    const sortedSeed = data.Players_Data.sort(
-      (a: any, b: any) => a.seed - b.seed
-    );
-
-    const adjustedPlayers = fillnull(sortedSeed);
-    for (let i = 1; i < adjustedPlayers.length; i++) {
-      adjustedPlayers[i - 1].id = i;
-    }
-    if (cmp_array[0] == true) {
-      players_array["singles"] = adjustedPlayers;
-    }
-    if (cmp_array[1] == true) {
-      players_array["doubles"] = adjustedPlayers;
-    }
-    if (cmp_array[2] == true) {
-      players_array["group"] = adjustedPlayers;
-    }
-    const result = locatePlayers(adjustedPlayers);
-    let tournament: any = locateRound(result.tournament);
-    if (ranking !== "none") {
-      tournament = Rankinglocate(tournament, ranking);
-    }
-    if (cmp_array[0] === true) {
-      tour_array["singles"] = [];
-      tour_array["singles"] = tournament;
-    } else if (cmp_array[1] === true) {
-      tour_array["doubles"] = [];
-      tour_array["doubles"] = tournament;
-    } else if (cmp_array[2] === true) {
-      tour_array["group"] = [];
-      tour_array["group"] = tournament;
-    }
-
     // 必要なファイルにデータを保存
-    await saveDataToFile(tourInfoData, tournamentInfoFilePath);
+    await saveDataToFile(tourInfoData, ProjectsPath);
     await saveDataToFile(players_array as any, newPlayersFilePath);
     await saveDataToFile(tour_array as any, newResultFilePath);
-
     res.json({
       message: "Data uploaded successfully",
       data: addInfoData,
@@ -538,22 +835,27 @@ app.post("/upload_simple", upload.single("file"), async (req, res) => {
   }
 });
 
-// ファイルアップロードエンドポイント
-app.post("/upload", upload.single("file"), async (req, res) => {});
-
 //大会情報取得エンドポイント
-app.get("/get-tour-info", (req, res) => {
-  const tournamentInfo = getDataFromFile(tournamentInfoFilePath);
+app.get("/get-all-tour-info", (req, res) => {
+  const tournamentInfo = getDataFromFile(ProjectsPath);
   res.json(tournamentInfo);
+});
+
+app.get("/get-tour-info", (req, res) => {
+  const id: number = parseInt(req.query.id as string);
+  const tournamentInfo = getDataFromFile(ProjectsPath);
+  const tour = tournamentInfo.filter((info) => info.id === id).flat()[0];
+  if (!tour) {
+    return res.status(404).json({ error: "Tournament information not found" });
+  }
+  res.json(tour);
 });
 
 //大会削除エンドポイント
 app.delete("/delete-tour-info", (req, res) => {
   const { id }: any = req.query;
   const tourid: number = id;
-  const tournamentInfo: TourInfo[] = getDataFromFile(
-    "data/TournamentInfo_data/TournamentInformation.json"
-  );
+  const tournamentInfo: TourInfo[] = getDataFromFile(ProjectsPath);
   const getInfo: TourInfo[] = tournamentInfo.filter(
     (info) => info.id == tourid
   );
@@ -570,13 +872,7 @@ app.delete("/delete-tour-info", (req, res) => {
       console.error(`Error removing uploaded file: ${err}`);
     }
   });
-  for (let i = 0; i < newInfo.length; i++) {
-    newInfo[i].id = newInfo[i].id - 1;
-  }
-  saveDataToFile(
-    newInfo,
-    "data/TournamentInfo_data/TournamentInformation.json"
-  );
+  saveDataToFile(newInfo, ProjectsPath);
   res.json({ message: "Tournament information deleted successfully" });
 });
 
@@ -587,7 +883,7 @@ app.put("/edit-players", (req, res) => {
   if (typeof id !== "string" && typeof competition !== "string") {
     return res.status(400).send("Invalid id or competition");
   }
-  const tourInfo: TourInfo[] = getDataFromFile(tournamentInfoFilePath);
+  const tourInfo: TourInfo[] = getDataFromFile(ProjectsPath);
   const tour = tourInfo.find((info) => info.id === parseInt(id as string));
   if (!tour) {
     return res.status(404).json({ error: "Tournament information not found" });
@@ -673,7 +969,7 @@ app.put("/edit-results", (req, res) => {
   }
   console.log(parseReq);
 
-  const tourInfo: TourInfo[] = getDataFromFile(tournamentInfoFilePath);
+  const tourInfo: TourInfo[] = getDataFromFile(ProjectsPath);
   const tour = tourInfo.find((info) => info.id === parseInt(id as string));
   if (!tour) {
     return res.status(404).json({ error: "Tournament information not found" });
@@ -912,6 +1208,62 @@ app.get("/gentour", async (req: Request, res: Response) => {
     res.status(500).json({ error: "Error generating tournament" });
   }
 });
+
+const authenticateToken = (req: Request, res: Response, next: NextFunction) => {
+  const token = req.header("Authorization")?.split(" ")[1];
+  if (!token) {
+    return res.status(401).json({ message: "Token required" });
+  }
+
+  jwt.verify(token, process.env.JWT_SECRET as string, (err, user) => {
+    if (err) {
+      return res.status(403).json({ message: "Invalid token" });
+    }
+
+    req.user = user as UserPayload;
+    next();
+  });
+};
+
+const authorizeRole = (roles: Array<"admin" | "editor" | "viewer">) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!roles.includes(req.user.role)) {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+    next();
+  };
+};
+
+app.get("/protected", authenticateToken, (req: Request, res: Response) => {
+  if (!req.user) {
+    return res.status(403).json({ message: "User not authenticated" });
+  }
+  res.json({ message: "This is a protected route", user: req.user });
+});
+
+app.get("/admin", authenticateToken, authorizeRole(["admin"]), (req, res) => {
+  res.json({ message: "Welcome to the admin panel" });
+});
+
+// 編集者以上がアクセス可能なルート
+app.get(
+  "/editor",
+  authenticateToken,
+  authorizeRole(["admin", "editor"]),
+  (req, res) => {
+    res.json({ message: "Welcome to the editor panel" });
+  }
+);
+
+// 閲覧者以上がアクセス可能なルート
+app.get(
+  "/viewer",
+  authenticateToken,
+  authorizeRole(["admin", "editor", "viewer"]),
+  (req, res) => {
+    res.json({ message: "Welcome to the viewer panel" });
+  }
+);
 
 const port = process.env.PORT || 3001;
 app.listen(port, () => {

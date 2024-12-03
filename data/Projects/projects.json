@@ -1,0 +1,54 @@
+[
+    {
+        "id": 1,
+        "name": "中国高専大会",
+        "venue": "高浜公園",
+        "date": "2024/7/5",
+        "gendate": "2024/11/07",
+        "players": "data/Players_data/players_20241107T043932305Z_10384.json",
+        "results": "data/Results_data/result_20241107T043932305Z_53982.json",
+        "sport": "badminton",
+        "point_name": "game",
+        "ranking": "none",
+        "competition": [
+            true,
+            false,
+            false
+        ]
+    },
+    {
+        "id": 2,
+        "name": "中国高専大会",
+        "venue": "高浜公園",
+        "date": "2024/7/5",
+        "gendate": "2024/11/12",
+        "players": "data/Players_data/players_20241112T051035019Z_42481.json",
+        "results": "data/Results_data/result_20241112T051035019Z_92330.json",
+        "sport": "badminton",
+        "point_name": "game",
+        "ranking": "4",
+        "competition": [
+            false,
+            true,
+            false
+        ]
+    },
+    {
+        "id": "76b163f9-3b02-4350-8bf0-bf7d251a70fc",
+        "name": "test",
+        "date": "2024/12/08",
+        "venue": "test",
+        "deadline": "2024/12/05",
+        "players": "data/Players_data/players_20241203T014425978Z_31297.json",
+        "results": "data/Results_data/result_20241203T014425979Z_16646.json",
+        "sport": "softtennis",
+        "point_name": "game",
+        "ranking": "8",
+        "competition": {
+            "singles": true,
+            "doubles": true,
+            "team": false
+        },
+        "generate_tourn": false
+    }
+]
